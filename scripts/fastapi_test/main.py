@@ -9,6 +9,6 @@ app = FastAPI()
 
 @app.post("/")
 async def root():
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
 
     return {"message": "Hello World"}

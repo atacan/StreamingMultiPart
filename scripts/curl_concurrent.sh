@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# Function to run a single curl request
+# Function to run a single curl request and print errors
 run_curl() {
-  curl -s "http://127.0.0.1:8080/" \
+  local output
+  output=$(curl -s -S "http://127.0.0.1:8080/" \
     -H "Content-Type: image/jpeg" \
-    --data-binary "@$HOME/Downloads/100MB.bin" > /dev/null 2>&1
+    --data-binary "@$HOME/Downloads/100MB.bin" 2>&1)
+  
+  if [ $? -ne 0 ]; then
+    echo "Error in curl request: $output" >&2
+  fi
 }
 
 # Array to store background process IDs
