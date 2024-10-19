@@ -48,8 +48,9 @@ struct MyController {
         outRequest.method = .POST
         outRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(boundary)")
 
+        var requestCopy = request
         let multiPartSequence = MultiPartRequestBodySequence(
-            base: request.body,
+            base: requestCopy.body,
             boundary: boundary,
             fieldName: "file",
             filename: "100MB.bin",
