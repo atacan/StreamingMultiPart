@@ -26,6 +26,6 @@ For example
 - run the script
 
 ```bash
-chmod +x .scripts//curl_concurrent.sh
+chmod +x ./scripts/curl_concurrent.sh
 ./scripts/curl_concurrent.sh
 ``` 
