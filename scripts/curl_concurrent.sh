@@ -11,7 +11,7 @@ run_curl() {
 pids=()
 
 # Start curl requests in the background
-for i in {1..30}
+for i in {1..3}
 do
   run_curl &
   pids+=($!)
