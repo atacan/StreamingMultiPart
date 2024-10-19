@@ -14,6 +14,7 @@ func buildApplication(configuration: ApplicationConfiguration) -> some Applicati
     // router.middlewares.add(LogRequestsMiddleware(.info))
     
     router.post("/donothing") { _, _ in
+        try await Task.sleep(nanoseconds: NSEC_PER_SEC)
         return "Hello"
     }
     
@@ -40,8 +41,8 @@ struct MyController {
         
         let boundary = UUID().uuidString
         // let outUrl = URL(string: "https://httpbin.org/post")!
-        // let outUrl = URL(string: "http://127.0.0.1:8080/donothing")! // to this server
-         let outUrl = URL(string: "http://127.0.0.1:80")! // some fastapi server that waits 1 second and returns a json
+         let outUrl = URL(string: "http://127.0.0.1:8080/donothing")! // to this server
+//         let outUrl = URL(string: "http://127.0.0.1:80")! // some fastapi server. see scripts/fastapi_test/main.py
         
         var outRequest = HTTPClientRequest.init(url: outUrl.absoluteString)
         outRequest.method = .POST

@@ -7,7 +7,7 @@ This service expects a multi-part form request.
 
 We don't want to collect the file into server's memory. That's why we want to stream this multi-part data to the third party service.
 
-For illustartion, we make the request to `httpbin.org/post` or some local server that does nothing.
+For illustartion, we make the request to `httpbin.org/post` or some local server that waits for a seconds and returns a hard-coded response.
 
 See [Application+build](Sources/App/Application+build.swift)
 
