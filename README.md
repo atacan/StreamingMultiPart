@@ -11,6 +11,12 @@ We don't want to collect the file into server's memory. That's why we want to st
 
 Observing the memory consumption on the Xcode debug navigator, we see very large spikes in memory although we create an AsyncStream for the third-party API request body.
 
+
+
+https://github.com/user-attachments/assets/bea19d1b-1c9d-4637-bab0-577dba7476c7
+
+<sub>Spike is around 00:06</sub>
+
 ## Reproduce
 
 Send thirty 100MB files concurrently.
