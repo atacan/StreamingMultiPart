@@ -85,8 +85,6 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
     private let fieldName: String
     private let filename: String
     private let mimeType: String
-    private var headerSent = false
-    private var footerSent = false
 
     init(base: Base, boundary: String, fieldName: String, filename: String, mimeType: String) {
         self.base = base
@@ -99,6 +97,9 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
     class AsyncIterator: AsyncIteratorProtocol {
         private var baseIterator: Base.AsyncIterator
         private var sequence: MultiPartRequestBodySequence
+        
+        private var headerSent = false
+        private var footerSent = false
 
         init(sequence: MultiPartRequestBodySequence) {
             self.sequence = sequence
@@ -106,8 +107,8 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
         }
 
         func next() async throws -> ByteBuffer? {
-            if !sequence.headerSent {
-                sequence.headerSent = true
+            if !headerSent {
+                headerSent = true
                 let headerString = [
                     "--\(sequence.boundary)\r\n",
                     "Content-Disposition: form-data; name=\"\(sequence.fieldName)\"; filename=\"\(sequence.filename)\"\r\n",
@@ -122,8 +123,8 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
                 return buffer
             }
 
-            if !sequence.footerSent {
-                sequence.footerSent = true
+            if !footerSent {
+                footerSent = true
                 logger.log(level: .info, "\(sequence.boundary) footerSent")
                 return ByteBuffer(string: "\r\n--\(sequence.boundary)--\r\n")
             }
