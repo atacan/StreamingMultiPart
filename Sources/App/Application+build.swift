@@ -48,7 +48,7 @@ struct MyController {
         outRequest.method = .POST
         outRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(boundary)")
 
-        var requestCopy = request
+        let requestCopy = request
         let multiPartSequence = MultiPartRequestBodySequence(
             base: requestCopy.body,
             boundary: boundary,
@@ -61,6 +61,7 @@ struct MyController {
 
         logger.log(level: .info, "starting request")
         let response = try await httpClient.execute(outRequest, timeout: .seconds(160))
+        for try await _ in response.body {}
         logger.log(level: .info, "finished request")
 
         return "Done"
@@ -97,7 +98,7 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
 
     class AsyncIterator: AsyncIteratorProtocol {
         private var baseIterator: Base.AsyncIterator
-        private var sequence: MultiPartRequestBodySequence
+        private let sequence: MultiPartRequestBodySequence
         
         private var headerSent = false
         private var footerSent = false
