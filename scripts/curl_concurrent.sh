@@ -3,7 +3,7 @@
 # Function to run a single curl request and print errors
 run_curl() {
   local output
-  output=$(curl -s -S "http://127.0.0.1:8080/" \
+  output=$(curl -s -S "http://127.0.0.1:8080/new" \
     -H "Content-Type: image/jpeg" \
     --data-binary "@$HOME/Downloads/100MB.bin" 2>&1)
   

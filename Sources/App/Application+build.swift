@@ -34,6 +34,7 @@ struct MyController {
 
     func addRoutes(to router: some RouterMethods<some RequestContext>) {
         router.post("/", use: self.streamRequestBodyToMultiPartRequest)
+        router.post("/new", use: self.newStreamRequestBodyToMultiPartRequest)
         router.post("/add", use: self.streamRequestBodyToMultiPartRequestWithAdditionalFields)
     }
 
@@ -51,11 +52,46 @@ struct MyController {
 
         let requestCopy = request
         let multiPartSequence = MultiPartFileBodyFromSequence(
-            base: requestCopy.body,
-            boundary: boundary,
-            fieldName: "file",
-            filename: "100MB.bin",
-            mimeType: "octet/stream"
+            multipartFile: .init(
+                fieldName: "file",
+                filename: "100MB.bin",
+                mimeType: "octet/stream",
+                content: requestCopy.body
+            ),
+            boundary: boundary
+        )
+
+        outRequest.body = .stream(multiPartSequence, length: .unknown)
+
+        logger.log(level: .info, "starting request")
+        let response = try await httpClient.execute(outRequest, timeout: .seconds(160))
+        for try await _ in response.body {}
+        logger.log(level: .info, "finished request")
+
+        return "Done"
+    }
+    
+    @Sendable
+    func newStreamRequestBodyToMultiPartRequest(request: Request, context: some RequestContext) async throws -> String {
+        logger.log(level: .info, "/new Request received")
+
+        let boundary = UUID().uuidString
+        let outUrl = "https://httpbin.org/post"
+//         let outUrl = "http://127.0.0.1:8080/donothing" // to this server
+//         let outUrl = "http://127.0.0.1:80" // some fastapi server. see scripts/fastapi_test/main.py
+
+        var outRequest = HTTPClientRequest(url: outUrl)
+        outRequest.method = .POST
+        outRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(boundary)")
+
+        let multiPartSequence = MultiPartFileBodyFromSequence(
+            multipartFile: .init(
+                fieldName: "file",
+                filename: "100MB.bin",
+                mimeType: "octet/stream",
+                content: request.body
+            ),
+            boundary: boundary
         )
 
         outRequest.body = .stream(multiPartSequence, length: .unknown)
@@ -79,11 +115,13 @@ struct MyController {
         outRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(boundary)")
 
         let multiPartSequence = MultiPartRequestBodySequence(
-            base: request.body,
+            multipartFile: .init(
+                fieldName: "file",
+                filename: "240432.jpg",
+                mimeType: "image/jpeg",
+                content: request.body
+            ),
             boundary: boundary,
-            fieldName: "file",
-            filename: "240432.jpg",
-            mimeType: "image/jpeg",
             additionalFields: FormFields(name: "name surname", email: "ed@ex.com")
         )
 
@@ -107,41 +145,42 @@ struct HTTPClientService: Service {
 
 let logger = Logger(label: "App")
 
+struct MultipartFile<Base: AsyncSequence & Sendable>: Sendable {
+    let fieldName: String
+    let filename: String
+    let mimeType: String
+    let content: Base
+}
+
 struct MultiPartFileBodyFromSequence<Base: AsyncSequence & Sendable>: AsyncSequence, Sendable where Base.Element == ByteBuffer {
     typealias Element = ByteBuffer
 
-    private let base: Base
+    private let multipartFile: MultipartFile<Base>
     private let boundary: String
-    private let fieldName: String
-    private let filename: String
-    private let mimeType: String
 
-    init(base: Base, boundary: String, fieldName: String, filename: String, mimeType: String) {
-        self.base = base
+    init(multipartFile: MultipartFile<Base>, boundary: String) {
+        self.multipartFile = multipartFile
         self.boundary = boundary
-        self.fieldName = fieldName
-        self.filename = filename
-        self.mimeType = mimeType
     }
 
     class AsyncIterator: AsyncIteratorProtocol {
-        private var baseIterator: Base.AsyncIterator
         private let sequence: MultiPartFileBodyFromSequence
+        private var baseIterator: Base.AsyncIterator
 
         private var headerSent = false
         private var footerSent = false
 
         init(sequence: MultiPartFileBodyFromSequence) {
             self.sequence = sequence
-            self.baseIterator = sequence.base.makeAsyncIterator()
+            self.baseIterator = sequence.multipartFile.content.makeAsyncIterator()
         }
 
         func next() async throws -> ByteBuffer? {
             if !headerSent {
                 let headerString = [
                     "--\(sequence.boundary)\r\n",
-                    "Content-Disposition: form-data; name=\"\(sequence.fieldName)\"; filename=\"\(sequence.filename)\"\r\n",
-                    "Content-Type: \(sequence.mimeType)\r\n\r\n"
+                    "Content-Disposition: form-data; name=\"\(sequence.multipartFile.fieldName)\"; filename=\"\(sequence.multipartFile.filename)\"\r\n",
+                    "Content-Type: \(sequence.multipartFile.mimeType)\r\n\r\n"
                 ].joined()
                 logger.log(level: .info, "\(sequence.boundary) headerSent")
                 headerSent = true
@@ -181,19 +220,13 @@ func jsonObjectString(_ data: ByteBuffer) throws -> String {
 struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable, T: Codable & Sendable>: AsyncSequence, Sendable where Base.Element == ByteBuffer {
     typealias Element = ByteBuffer
 
-    private let base: Base
+    private let multipartFile: MultipartFile<Base>
     private let boundary: String
-    private let fieldName: String
-    private let filename: String
-    private let mimeType: String
     private let additionalFields: T
 
-    init(base: Base, boundary: String, fieldName: String, filename: String, mimeType: String, additionalFields: T) {
-        self.base = base
+    init(multipartFile: MultipartFile<Base>, boundary: String, additionalFields: T) {
+        self.multipartFile = multipartFile
         self.boundary = boundary
-        self.fieldName = fieldName
-        self.filename = filename
-        self.mimeType = mimeType
         self.additionalFields = additionalFields
     }
 
@@ -205,7 +238,7 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable, T: Codable &
 
         init(sequence: MultiPartRequestBodySequence) {
             self.sequence = sequence
-            self.baseIterator = sequence.base.makeAsyncIterator()
+            self.baseIterator = sequence.multipartFile.content.makeAsyncIterator()
         }
 
         func next() async throws -> ByteBuffer? {
@@ -221,8 +254,8 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable, T: Codable &
             case .fileHeader:
                 let headerString = [
                     "--\(sequence.boundary)\r\n",
-                    "Content-Disposition: form-data; name=\"\(sequence.fieldName)\"; filename=\"\(sequence.filename)\"\r\n",
-                    "Content-Type: \(sequence.mimeType)\r\n\r\n"
+                    "Content-Disposition: form-data; name=\"\(sequence.multipartFile.fieldName)\"; filename=\"\(sequence.multipartFile.filename)\"\r\n",
+                    "Content-Type: \(sequence.multipartFile.mimeType)\r\n\r\n"
                 ].joined()
                 logger.log(level: .info, "\(sequence.boundary) headerSent")
                 state.nextCase()
