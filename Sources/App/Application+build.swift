@@ -36,6 +36,7 @@ struct MyController {
         router.post("/", use: self.streamRequestBodyToMultiPartRequest)
         router.post("/new", use: self.newStreamRequestBodyToMultiPartRequest)
         router.post("/add", use: self.streamRequestBodyToMultiPartRequestWithAdditionalFields)
+        router.post("/multifileextract", use: self.streamFileFromMultiparRequestBody)
     }
 
     @Sendable
@@ -132,6 +133,33 @@ struct MyController {
         let responseBody = try await response.body.collect(upTo: 10 * 1024 * 1024)
         return try jsonObjectString(responseBody)
     }
+    
+    @Sendable
+    func streamFileFromMultiparRequestBody(request: Request, context: some RequestContext) async throws -> String {
+        logger.log(level: .info, "multifileextract Request received")
+        guard let contentType = request.headers[.contentType],
+              let mediaType = MediaType(from: contentType),
+              let parameter = mediaType.parameter,
+              parameter.name == "boundary"
+        else {
+            throw HTTPError(.unsupportedMediaType)
+        }
+        let fileBuffers = FileByteBufferSequenceFromMultiPart(base: request.body, boundary: parameter.value, fieldName: "file")
+        
+        let fileIO = FileIO()
+        let fileURL = try FileManager.default.url(
+            for: .downloadsDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ).appendingPathComponent("240432_from_HB.jpg")
+        try await fileIO.writeFile(
+            contents: fileBuffers,
+            path: fileURL.path,
+            context: context
+        )
+        return "Done"
+    }
 }
 
 struct HTTPClientService: Service {
@@ -213,7 +241,6 @@ func jsonObjectString(_ data: ByteBuffer) throws -> String {
     let jsonData = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
     let jsonPretty = String(data: jsonData, encoding: .utf8)
 
-//    @Dependency(\.logger) var logger
     return "\(jsonPretty ?? "Could not pretty print JSON")"
 }
 
