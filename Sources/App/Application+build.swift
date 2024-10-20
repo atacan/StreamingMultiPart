@@ -110,24 +110,24 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
 
         func next() async throws -> ByteBuffer? {
             if !headerSent {
-                headerSent = true
                 let headerString = [
                     "--\(sequence.boundary)\r\n",
                     "Content-Disposition: form-data; name=\"\(sequence.fieldName)\"; filename=\"\(sequence.filename)\"\r\n",
                     "Content-Type: \(sequence.mimeType)\r\n\r\n"
                 ].joined()
                 logger.log(level: .info, "\(sequence.boundary) headerSent")
+                headerSent = true
                 return ByteBuffer(string: headerString)
             }
 
             if let buffer = try await baseIterator.next() {
-                // logger.log(level: .info, "baseIterator.next")
+                print(".", terminator: "")
                 return buffer
             }
 
             if !footerSent {
-                footerSent = true
                 logger.log(level: .info, "\(sequence.boundary) footerSent")
+                footerSent = true
                 return ByteBuffer(string: "\r\n--\(sequence.boundary)--\r\n")
             }
 
@@ -138,4 +138,14 @@ struct MultiPartRequestBodySequence<Base: AsyncSequence & Sendable>: AsyncSequen
     func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(sequence: self)
     }
+}
+
+func jsonObjectString(_ data: ByteBuffer) throws -> String {
+    let json = try JSONSerialization.jsonObject(with: data, options: [.allowFragments])
+    // pretty print the json object
+    let jsonData = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
+    let jsonPretty = String(data: jsonData, encoding: .utf8)
+
+//    @Dependency(\.logger) var logger
+    return "\(jsonPretty ?? "Could not pretty print JSON")"
 }
