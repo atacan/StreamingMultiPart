@@ -10,6 +10,7 @@ let package = Package(
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.6.0"),
+        .package(url: "https://github.com/vapor/multipart-kit.git", from: "4.0.0"),
 
     ],
     targets: [
@@ -19,7 +20,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
-
+                .product(name: "MultipartKit", package: "multipart-kit"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of
